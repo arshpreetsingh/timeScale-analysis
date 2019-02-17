@@ -1,0 +1,50 @@
+--creating a simpe table
+
+CREATE TABLE conditions (
+time 		TIMESTAMP	NOT NULL,
+location	TEXT	NOT NULL,
+temperature	DOUBLE PRECISION	NULL,
+humidity	DOUBLE PRECISION	NULL);
+
+-- creating a hypertable. now it wil be partioned with location
+
+SELECT create_hypertable('conditions','time','location',4);
+
+INSERT INTO conditions(time, location, temperature, humidity)
+  VALUES (NOW(), 'office', 70.0, 50.0);
+
+SELECT * FROM conditions ORDER BY time DESC LIMIT 100;
+
+-- updating data on Hyper tables
+
+UPDATE conditions SET temperature = 20000, humidity = 50000
+  WHERE time = '2019-02-17 12:45:02.189422' AND location = 'office';
+
+SELECT * FROM conditions ORDER BY temperature DESC LIMIT 100;
+
+-- upserting data
+
+-- create it with unique IDs
+
+CREATE TABLE conditions_unique (
+    time        TIMESTAMPTZ       NOT NULL,
+    location    TEXT              NOT NULL,
+    temperature DOUBLE PRECISION  NULL,
+    humidity    DOUBLE PRECISION  NULL,
+    UNIQUE (time, location)
+);
+
+
+INSERT INTO conditions_unique(time, location, temperature, humidity)
+  VALUES (NOW(), 'office', 70.0, 50.0);
+
+
+INSERT INTO conditions_unique
+  VALUES ('2019-02-17 12:56:05.080302+05:30', 'office', 898900000000.1, 9879678000000000.0)
+  ON CONFLICT DO NOTHING;
+
+SELECT * FROM conditions_unique ORDER BY temperature DESC LIMIT 100;
+
+DELETE FROM conditions_unique WHERE temperature < 35 OR humidity < 60;
+
+SELECT * FROM conditions_unique ORDER BY temperature DESC LIMIT 100;

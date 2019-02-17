@@ -1,0 +1,28 @@
+-- Before going with this you have to download and setup NYC data 
+-- Folow this link https://docs.timescale.com/v1.2/tutorials/tutorial-hello-nyc
+
+\c nyc_data
+
+SELECT date_trunc('day', pickup_datetime) as day, avg(fare_amount)
+  FROM rides
+  WHERE passenger_count > 1 AND pickup_datetime < '2016-01-08'
+  GROUP BY day ORDER BY day;
+
+SELECT date_trunc('day', pickup_datetime) as day, COUNT(*) FROM rides
+  GROUP BY day ORDER BY day
+  LIMIT 5;
+  
+SELECT time_bucket('5 minute', pickup_datetime) AS five_min, count(*)
+  FROM rides
+  WHERE pickup_datetime < '2016-01-01 02:00'
+  GROUP BY five_min ORDER BY five_min;
+
+SELECT rate_code, COUNT(vendor_id) as num_trips FROM rides
+  WHERE pickup_datetime < '2016-01-08'
+  GROUP BY rate_code ORDER BY rate_code;
+
+-- Join rides with rates to get more information on rate_code
+SELECT rates.description, COUNT(vendor_id) as num_trips FROM rides
+  JOIN rates on rides.rate_code = rates.rate_code
+  WHERE pickup_datetime < '2016-01-08'
+  GROUP BY rates.description ORDER BY rates.description;

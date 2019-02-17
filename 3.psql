@@ -1,0 +1,105 @@
+-- ============================================================
+-- Structure
+-- ============================================================
+
+CREATE DATABASE test;
+
+\c test;
+
+CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+
+CREATE TABLE collfact (
+  time        TIMESTAMP       NOT NULL,
+  pointid     BIGINT            NOT NULL,
+  value       DOUBLE PRECISION  NULL,
+  mesureid    BIGINT            NULL,
+  version     INT               NULL,
+  insertiondate TIMESTAMP     NULL,
+  iscurrent   CHAR(1)
+);
+
+SELECT create_hypertable('collfact', 'time', 'pointid', 16, chunk_time_interval => interval '1 day');
+
+create index on collfact(time, pointid);
+
+-- ============================================================
+-- Generate test data, ~ 1 year
+-- ============================================================
+
+-- meter location, or point
+create table point( 
+ pointid BIGINT NOT NULL PRIMARY KEY,
+ pointnm VARCHAR(20) NOT NULL
+);
+
+CREATE SEQUENCE pointid_seq START 1;
+
+CREATE OR REPLACE FUNCTION genPoints(in a_no_of_records integer) RETURNS integer AS $$
+DECLARE
+    v_counter integer;
+    vhash bigint;
+BEGIN
+    v_counter := 1;
+    RAISE NOTICE 'No of records to insert : %', a_no_of_records;
+    WHILE (v_counter <= a_no_of_records) LOOP  
+	IF( v_counter % 10000 =0) THEN
+	    RAISE NOTICE 'Counter here is %', v_counter;
+	END IF;
+	vhash := nextval('pointid_seq');
+	--insert into partiton table
+	INSERT INTO point(pointid, pointnm)
+			VALUES (vhash, 'Point num.' || vhash);
+    v_counter := v_counter + 1;
+    END LOOP;
+    RETURN 0;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Meter creation
+select * from genPoints(10000);
+
+create table time (
+ time        TIMESTAMP       NOT NULL PRIMARY KEY
+);
+
+-- Year 2018, step 15'
+INSERT INTO time(time)
+SELECT dd
+FROM generate_series
+        (timestamp '2018-01-01 00:00:00' 
+        , timestamp '2018-12-31 23:45:00'
+        , '15 minutes'::interval) dd ;
+
+-- mesure type table; just 4 here
+CREATE TABLE mesure (
+ mesureid    BIGINT            NOT NULL PRIMARY KEY,
+ mesurenm    VARCHAR(20)
+); 
+
+INSERT INTO MESURE (mesureid, mesurenm) VALUES (1, 'P+');
+INSERT INTO MESURE (mesureid, mesurenm) VALUES (2, 'P-');
+INSERT INTO MESURE (mesureid, mesurenm) VALUES (3, 'Q+');
+INSERT INTO MESURE (mesureid, mesurenm) VALUES (4, 'Q-');
+
+\timing on
+
+-- INSERT for 1000 meters, 2 mesure types
+insert into collfact (time, pointid, value, mesureid, version, insertiondate, iscurrent)
+select time, pointid, trunc(random() * 99999), 1 as mesureid, 1, now(), '1' 
+from 
+(select * from time) as a, 
+(select * from point limit 1000) as b
+UNION ALL
+select time, pointid, trunc(random() * 99999), 2 as mesureid, 1, now(), '1' 
+from 
+(select * from time) as a, 
+(select * from point limit 1000) as b;
+
+-- INSERT for 1000 meters, 2 mesure types
+insert into collfact (time, pointid, value, mesureid, version, insertiondate, iscurrent)
+select time, pointid, trunc(random() * 99999), 3 as mesureid, 1, now(), '1' 
+from 
+(select * from time) as a, 
+(select * from point limit 1000) as b;
+
+
